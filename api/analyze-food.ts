@@ -1,21 +1,12 @@
-import express from 'express';
-import { createServer as createViteServer } from 'vite';
-import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
-import fs from 'node:fs';
-import path from 'node:path';
 
-dotenv.config();
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-const app = express();
-const port = Number(process.env.PORT) || 3000;
-
-app.use(express.json({ limit: '25mb' }));
-
-// Server-side Gemini AI Food Analysis Endpoint
-app.post('/api/analyze-food', async (req, res) => {
   try {
-    const { imageBase64, mimeType = 'image/jpeg' } = req.body;
+    const { imageBase64, mimeType = 'image/jpeg' } = req.body || {};
     if (!imageBase64) {
       return res.status(400).json({ error: 'No image provided for food recognition.' });
     }
@@ -23,7 +14,6 @@ app.post('/api/analyze-food', async (req, res) => {
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
 
     if (!process.env.GEMINI_API_KEY) {
-      // Realistic intelligent fallback if API key is not configured
       return res.status(200).json({
         foodName: 'Grilled Atlantic Salmon with Quinoa & Asparagus',
         portionSize: '1 standard fillet + sides (340g)',
@@ -117,9 +107,9 @@ Be accurate, scientific, and realistic.`
 
     const resultText = response.text;
     const parsed = JSON.parse(resultText || '{}');
-    return res.json(parsed);
+    return res.status(200).json(parsed);
   } catch (error: any) {
-    console.warn('Server Gemini AI fallback activated:', error?.message || error);
+    console.warn('Vercel Gemini AI fallback activated:', error?.message || error);
     return res.status(200).json({
       foodName: 'Nutrient-Dense Meal Bowl',
       portionSize: '1 standard serving (320g)',
@@ -135,37 +125,4 @@ Be accurate, scientific, and realistic.`
       summary: 'Scientifically verified nutrient profile with balanced macronutrients and soluble fiber.'
     });
   }
-});
-
-// Vite server in dev or static files in production
-async function startServer() {
-  if (process.env.NODE_ENV === 'production' && fs.existsSync(path.resolve('dist/index.html'))) {
-    app.use(express.static('dist'));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.resolve('dist/index.html'));
-    });
-  } else {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-
-    app.use('*', async (req, res, next) => {
-      const url = req.originalUrl;
-      try {
-        let template = fs.readFileSync(path.resolve('index.html'), 'utf-8');
-        template = await vite.transformIndexHtml(url, template);
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
-      } catch (e) {
-        next(e);
-      }
-    });
-  }
-
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Server listening on http://localhost:${port}`);
-  });
 }
-
-startServer();
