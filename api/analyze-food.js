@@ -1,12 +1,28 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { imageBase64, mimeType = 'image/jpeg' } = req.body || {};
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        body = {};
+      }
+    }
+    const { imageBase64, mimeType = 'image/jpeg' } = body || {};
     if (!imageBase64) {
       return res.status(400).json({ error: 'No image provided for food recognition.' });
     }
